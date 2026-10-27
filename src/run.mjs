@@ -14,7 +14,7 @@ const arg = (name, fallback) => {
   return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 
-export async function runHunter({ pool, hunter, trigger, runUrl = null, load = (name) => import(`./hunters/${name}.mjs`), log = console.log }) {
+export async function runHunter({ pool, hunter, trigger, runUrl = null, capOverride = null, load = (name) => import(`./hunters/${name}.mjs`), log = console.log }) {
   if (!/^[a-z_]{3,40}$/.test(hunter)) throw new Error(`"${hunter}" isn't a hunter name.`);
   const state = await database.getState(pool, hunter);
   if (!state) throw new Error(`There is no hunter called "${hunter}".`);
@@ -33,7 +33,7 @@ export async function runHunter({ pool, hunter, trigger, runUrl = null, load = (
     const counts = { seen: 0, upserted: 0, signals: 0 };
     const result = await mod.run({
       fetchJson,
-      cap: state.nightly_cap,
+      cap: trigger === "manual" && capOverride ? capOverride : state.nightly_cap, // only a person starting it by hand may lift the nightly cap
       cursor: state.cursor ?? {},
       log,
       db: {
@@ -63,6 +63,7 @@ export async function runHunter({ pool, hunter, trigger, runUrl = null, load = (
 async function main() {
   const hunter = arg("hunter", "due");
   const trigger = arg("trigger", "manual");
+  const capOverride = Number(arg("cap", 0)) || null;
   const runUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null;
   const pool = database.connect();
@@ -71,7 +72,7 @@ async function main() {
     const names = hunter === "due" ? await database.dueHunters(pool) : [hunter];
     if (names.length === 0) console.log("No hunter is due.");
     for (const name of names) {
-      const r = await runHunter({ pool, hunter: name, trigger, runUrl });
+      const r = await runHunter({ pool, hunter: name, trigger, runUrl, capOverride });
       if (r.ok === false) failed = true;
     }
   } finally {
