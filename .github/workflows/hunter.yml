@@ -1,0 +1,40 @@
+name: hunter
+
+# Started every night by the Shipper Book database (through the GitHub API), and again by its watchdog after a failure.
+# GitHub's own schedule below is only a backup: it runs just the hunters that are due and skips the rest.
+on:
+  workflow_dispatch:
+    inputs:
+      hunter:
+        description: "A hunter name (for example private_fleet), or due to run every hunter that is due"
+        required: true
+        default: due
+      trigger:
+        description: "cron, watchdog or manual"
+        required: false
+        default: manual
+  schedule:
+    - cron: "30 9 * * *"
+
+concurrency:
+  group: hunter-${{ inputs.hunter || 'due' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node src/run.mjs --hunter "${{ inputs.hunter || 'due' }}" --trigger "${{ inputs.trigger || 'schedule' }}"
+        env:
+          HUNTER_DATABASE_URL: ${{ secrets.HUNTER_DATABASE_URL }}
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}

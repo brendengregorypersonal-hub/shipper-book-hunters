@@ -1,0 +1,15 @@
+{
+  "name": "shipper-book-hunters",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nightly collectors of free public data for Freight Radar. Collection only: no scoring, matching or company logic.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "hunt": "node src/run.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
